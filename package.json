@@ -1,0 +1,16 @@
+{
+  "name": "functional-programming-in-scala-second",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PDF-to-Markdown workspace for Functional Programming in Scala, Second Edition",
+  "scripts": {
+    "convert": "python scripts/pdf_to_md.py",
+    "dev": "vitepress dev docs",
+    "build": "vitepress build docs",
+    "serve": "vitepress serve docs"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.4"
+  }
+}
+

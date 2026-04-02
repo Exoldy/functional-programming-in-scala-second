@@ -1,0 +1,36 @@
+# Functional Programming in Scala, Second Edition
+
+This repository turns the source PDF into a VitePress-friendly set of Markdown files.
+
+## Workflow
+
+1. Install JavaScript dependencies:
+
+   ```bash
+   npm install
+   ```
+
+2. Regenerate the Markdown pages from the PDF:
+
+   ```bash
+   npm run convert
+   ```
+
+3. Start the local reader:
+
+   ```bash
+   npm run dev
+   ```
+
+## Output structure
+
+- `docs/pages/page-XXXX.md` - one Markdown file per PDF page
+- `docs/pages/assets/` - extracted image assets referenced by Markdown
+- `docs/pages/index.md` - generated page index based on the PDF table of contents
+- `docs/.vitepress/sidebar.mjs` - generated sidebar entries for VitePress
+
+## Notes
+
+- The conversion is block-based and tries to preserve headings, inline code, code blocks, and meaningful images.
+- Decorative exercise banners are filtered out, while content images are exported and linked from the page Markdown.
+- The script is safe to rerun; generated Markdown and extracted assets are rebuilt on each run.
