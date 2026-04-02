@@ -16,6 +16,7 @@ DEFAULT_PDF = ROOT / "Functional_Programming_in_Scala_Second_.pdf"
 DOCS_DIR = ROOT / "docs"
 PAGES_DIR = DOCS_DIR / "pages"
 ASSETS_DIR = PAGES_DIR / "assets"
+LEGACY_ASSETS_DIR = DOCS_DIR / "public" / "page-assets"
 VITEPRESS_DIR = DOCS_DIR / ".vitepress"
 SIDEBAR_FILE = VITEPRESS_DIR / "sidebar.mjs"
 PAGES_INDEX_FILE = PAGES_DIR / "index.md"
@@ -62,6 +63,8 @@ def ensure_dirs() -> None:
 def clean_generated_output() -> None:
     if PAGES_DIR.exists():
         shutil.rmtree(PAGES_DIR)
+    if LEGACY_ASSETS_DIR.exists():
+        shutil.rmtree(LEGACY_ASSETS_DIR)
     PAGES_DIR.mkdir(parents=True, exist_ok=True)
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
 
