@@ -27,3 +27,7 @@
 - Не меняй количество fenced `scala` blocks.
 - Не меняй YAML frontmatter, ссылки, изображения и обычный текст.
 - Разрешены только whitespace/indentation/line-break changes внутри fenced `scala` blocks.
+- После строк `def ... =`, `if ... then`, `else`, `match`, `case`, `for`, `yield`, `try`, `catch`, `finally`, `enum`, `object`, `class`, `trait`, `given`, `extension`, `.map:` и `.flatMap:` восстанавливай именно значимую вложенность Scala 3.
+- `case`-ветки должны быть выровнены под своим `match` или trailing-colon блоком, а их тела должны быть вложены ещё на один уровень.
+- Цепочки, начинающиеся с точки, не отрывай от receiver и не сплющивай в левую колонку.
+- REPL/diagnostic snippets с `scala>` сохраняй максимально близко к исходнику; не превращай их в “красивый” исходный файл.

@@ -7,7 +7,6 @@ import os
 import re
 import sys
 import time
-import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -23,15 +22,15 @@ APP_URL = "https://github.com/exoldy/functional-programming-in-scala-second"
 OUTER_FENCE_RE = re.compile(r"^```[a-zA-Z0-9_-]*\n(.*)\n```[ \t]*$", re.DOTALL)
 FENCE_START_RE = re.compile(r"^```([^\n`]*)$")
 
-TRIPLE_STRING_RE = re.compile(r'"""(?:.|\\n)*?"""', re.DOTALL)
+TRIPLE_STRING_RE = re.compile(r'"""(?:.|\n)*?"""', re.DOTALL)
 DOUBLE_STRING_RE = re.compile(r'"(?:\\.|[^"\\])*"')
 CHAR_RE = re.compile(r"'(?:\\.|[^'\\])'")
 LINE_COMMENT_RE = re.compile(r"//.*?$", re.MULTILINE)
-BLOCK_COMMENT_RE = re.compile(r"/\\*(?:.|\\n)*?\\*/", re.DOTALL)
+BLOCK_COMMENT_RE = re.compile(r"/\*(?:.|\n)*?\*/", re.DOTALL)
 IDENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
-NUMBER_RE = re.compile(r"(?:0x[0-9A-Fa-f]+|\\d+(?:\\.\\d+)?)")
-OP_RE = re.compile(r"=>|<-|::|[=:+\\-*/<>!|&%^~?.@#]+")
-PUNCT_RE = re.compile(r"[()\\[\\]{},;]")
+NUMBER_RE = re.compile(r"(?:0x[0-9A-Fa-f]+|\d+(?:\.\d+)?)")
+OP_RE = re.compile(r"=>|<-|::|[=:+\-*/<>!|&%^~?.@#]+")
+PUNCT_RE = re.compile(r"[()\[\]{},;]")
 
 
 def parse_args() -> argparse.Namespace:
@@ -59,6 +58,46 @@ def collect_files(args: argparse.Namespace) -> list[str]:
     return files
 
 
+def split_parts(markdown_text: str) -> list[tuple[str, str]]:
+    lines = markdown_text.splitlines(keepends=True)
+    parts: list[tuple[str, str]] = []
+    text_chunk: list[str] = []
+    index = 0
+
+    while index < len(lines):
+        line = lines[index]
+        match = FENCE_START_RE.match(line.rstrip("\n"))
+        if match:
+            if text_chunk:
+                parts.append(("text", "".join(text_chunk)))
+                text_chunk = []
+
+            block_lines = [line]
+            info = match.group(1).strip()
+            index += 1
+            while index < len(lines):
+                block_lines.append(lines[index])
+                if lines[index].startswith("```"):
+                    index += 1
+                    break
+                index += 1
+            block = "".join(block_lines)
+            block_type = "scala" if info.startswith("scala") else "fence"
+            parts.append((block_type, block))
+            continue
+
+        text_chunk.append(line)
+        index += 1
+
+    if text_chunk:
+        parts.append(("text", "".join(text_chunk)))
+    return parts
+
+
+def extract_scala_blocks(markdown_text: str) -> list[str]:
+    return [content for kind, content in split_parts(markdown_text) if kind == "scala"]
+
+
 def strip_outer_fence(text: str) -> str:
     stripped = text.strip()
     match = OUTER_FENCE_RE.match(stripped)
@@ -67,82 +106,45 @@ def strip_outer_fence(text: str) -> str:
     return stripped + ("\n" if not stripped.endswith("\n") else "")
 
 
-def reserve_token(prefix: str, counter: dict[str, int], placeholders: dict[str, str], content: str) -> str:
-    counter["value"] += 1
-    token = f"⟪KEEP_{prefix}_{counter['value']:04d}⟫"
-    placeholders[token] = content
-    return token
+def scala_body_from_block(block: str) -> str:
+    lines = block.splitlines()
+    if len(lines) < 2:
+        return ""
+    if lines[-1].startswith("```"):
+        return "\n".join(lines[1:-1])
+    return "\n".join(lines[1:])
 
 
-def mask_except_scala(markdown_text: str) -> tuple[str, dict[str, str]]:
-    placeholders: dict[str, str] = {}
-    counter = {"value": 0}
-    lines = markdown_text.splitlines(keepends=True)
-    out: list[str] = []
-    i = 0
-
-    while i < len(lines):
-        line = lines[i]
-        match = FENCE_START_RE.match(line.rstrip("\n"))
-        if match:
-            info = match.group(1).strip()
-            block_lines = [line]
-            i += 1
-            while i < len(lines):
-                block_lines.append(lines[i])
-                if lines[i].startswith("```"):
-                    i += 1
-                    break
-                i += 1
-            block = "".join(block_lines)
-            if info.startswith("scala"):
-                out.append(block)
-            else:
-                out.append(reserve_token("BLOCK", counter, placeholders, block))
-            continue
-
-        chunk_lines = []
-        while i < len(lines):
-            next_match = FENCE_START_RE.match(lines[i].rstrip("\n"))
-            if next_match:
-                break
-            chunk_lines.append(lines[i])
-            i += 1
-        chunk = "".join(chunk_lines)
-        if chunk:
-            out.append(reserve_token("BLOCK", counter, placeholders, chunk))
-
-    return "".join(out), placeholders
+def is_repl_block(block: str) -> bool:
+    for line in scala_body_from_block(block).splitlines():
+        if line.strip():
+            return line.lstrip().startswith("scala>")
+    return False
 
 
-def restore_placeholders(text: str, placeholders: dict[str, str]) -> str:
-    restored = text
-    for token, original in placeholders.items():
-        restored = restored.replace(token, original)
-    return restored
-
-
-def extract_scala_blocks(markdown_text: str) -> list[str]:
-    lines = markdown_text.splitlines(keepends=True)
-    blocks: list[str] = []
-    i = 0
-    while i < len(lines):
-        match = FENCE_START_RE.match(lines[i].rstrip("\n"))
-        if match:
-            info = match.group(1).strip()
-            block_lines = [lines[i]]
-            i += 1
-            while i < len(lines):
-                block_lines.append(lines[i])
-                if lines[i].startswith("```"):
-                    i += 1
-                    break
-                i += 1
-            if info.startswith("scala"):
-                blocks.append("".join(block_lines))
-            continue
-        i += 1
-    return blocks
+def should_skip_block(block: str) -> tuple[bool, str]:
+    body = scala_body_from_block(block)
+    stripped_lines = [line.strip() for line in body.splitlines() if line.strip()]
+    if not stripped_lines:
+        return True, "empty"
+    if is_repl_block(block):
+        return True, "repl"
+    if "➥" in body:
+        return True, "trace"
+    if body.lstrip().startswith("/**"):
+        return True, "doc-comment"
+    if "extesnion" in body:
+        return True, "ocr-typo"
+    if body.count("def ") > 1:
+        return True, "multi-def"
+    if " . ==" in body:
+        return True, "theorem-snippet"
+    last_line = stripped_lines[-1]
+    if last_line.endswith(":"):
+        return True, "truncated-colon"
+    if body.count("(") != body.count(")"):
+        return True, "unbalanced-parens"
+    return False, ""
 
 
 def scala_tokenize(code: str) -> list[str]:
@@ -179,31 +181,7 @@ def scala_tokenize(code: str) -> list[str]:
     return tokens
 
 
-def scala_body_from_block(block: str) -> str:
-    lines = block.splitlines()
-    if len(lines) < 2:
-        return ""
-    if lines[-1].startswith("```"):
-        return "\n".join(lines[1:-1])
-    return "\n".join(lines[1:])
-
-
-def validate_scala_blocks(original_md: str, fixed_md: str, rel_name: str) -> None:
-    original_blocks = extract_scala_blocks(original_md)
-    fixed_blocks = extract_scala_blocks(fixed_md)
-    if len(original_blocks) != len(fixed_blocks):
-        raise RuntimeError(
-            f"{rel_name}: scala block count changed: {len(original_blocks)} -> {len(fixed_blocks)}"
-        )
-
-    for idx, (old_block, new_block) in enumerate(zip(original_blocks, fixed_blocks), start=1):
-        old_body = scala_body_from_block(old_block)
-        new_body = scala_body_from_block(new_block)
-        if scala_tokenize(old_body) != scala_tokenize(new_body):
-            raise RuntimeError(f"{rel_name}: scala block {idx} changed non-whitespace tokens")
-
-
-def request_fix(api_key: str, model: str, prompt: str, rel_name: str, masked_md: str) -> str:
+def request_fix(api_key: str, model: str, prompt: str, rel_name: str, block_index: int, block: str) -> str:
     body = {
         "model": model,
         "temperature": 0.0,
@@ -213,15 +191,16 @@ def request_fix(api_key: str, model: str, prompt: str, rel_name: str, masked_md:
                 "role": "user",
                 "content": "\n".join(
                     [
-                        "Исправь только форматирование fenced scala code blocks.",
-                        "- Чини только отступы, переводы строк и layout Scala 3.",
-                        "- Не меняй не-whitespace токены кода.",
-                        "- Не трогай токены ⟪KEEP_*⟫.",
-                        "- Верни весь markdown документ целиком.",
+                        "Исправь только форматирование одного fenced scala code block.",
+                        "- Верни ровно один fenced `scala` block.",
+                        "- Меняй только пробелы, отступы и переводы строк.",
+                        "- Не меняй никакие не-whitespace токены.",
+                        "- Если это REPL/diagnostic snippet с `scala>`, не переписывай его как обычный исходник.",
                         "",
                         f"Файл: {rel_name}",
+                        f"Блок: {block_index}",
                         "",
-                        masked_md,
+                        block,
                     ]
                 ),
             },
@@ -238,6 +217,21 @@ def request_fix(api_key: str, model: str, prompt: str, rel_name: str, masked_md:
     with urllib.request.urlopen(request, timeout=180) as response:
         payload = json.loads(response.read().decode("utf-8"))
     return payload["choices"][0]["message"]["content"]
+
+
+def normalize_scala_block(candidate: str, original: str) -> str:
+    body = strip_outer_fence(candidate)
+    first_line = original.splitlines(keepends=True)[0]
+    if not first_line.endswith("\n"):
+        first_line = first_line + "\n"
+    return f"{first_line}{body}```\n"
+
+
+def validate_block(original_block: str, fixed_block: str, rel_name: str, block_index: int) -> None:
+    original_tokens = scala_tokenize(scala_body_from_block(original_block))
+    fixed_tokens = scala_tokenize(scala_body_from_block(fixed_block))
+    if original_tokens != fixed_tokens:
+        raise RuntimeError(f"{rel_name}: scala block {block_index} changed non-whitespace tokens")
 
 
 def main() -> None:
@@ -258,23 +252,38 @@ def main() -> None:
             continue
 
         original = path.read_text(encoding="utf-8")
-        if "```scala" not in original:
+        parts = split_parts(original)
+        scala_count = sum(1 for kind, _ in parts if kind == "scala")
+        if scala_count == 0:
             print(f"skip no-scala {name}")
             continue
 
-        print(f"fix-scala {name}")
-        masked, placeholders = mask_except_scala(original)
-        fixed = request_fix(args.api_key, args.model, prompt, name, masked)
-        fixed = strip_outer_fence(fixed)
-        missing = [token for token in placeholders if token not in fixed]
-        if missing:
-            raise RuntimeError(f"{name}: model damaged placeholders: {missing[:5]}")
-        restored = restore_placeholders(fixed, placeholders)
-        validate_scala_blocks(original, restored, name)
+        updated_parts: list[tuple[str, str]] = []
+        block_index = 0
+        print(f"fix-scala {name} blocks={scala_count}")
+        for kind, content in parts:
+            if kind != "scala":
+                updated_parts.append((kind, content))
+                continue
 
-        if args.overwrite or restored != original:
+            block_index += 1
+            skip, reason = should_skip_block(content)
+            if skip:
+                updated_parts.append((kind, content))
+                print(f"skip {reason} {name}#{block_index}")
+                continue
+            response = request_fix(args.api_key, args.model, prompt, name, block_index, content)
+            normalized = normalize_scala_block(response, content)
+            validate_block(content, normalized, name, block_index)
+            updated_parts.append((kind, normalized))
+            time.sleep(0.05)
+
+        restored = "".join(content for _, content in updated_parts)
+        if args.overwrite and restored != original:
             path.write_text(restored, encoding="utf-8")
-        time.sleep(0.1)
+            print(f"wrote {name}")
+        else:
+            print(f"checked {name}")
 
 
 if __name__ == "__main__":

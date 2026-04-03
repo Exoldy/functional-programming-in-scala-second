@@ -87,7 +87,6 @@ def main() -> None:
     args = parse_args()
     if not args.api_key:
         raise SystemExit("Missing OPENROUTER_API_KEY or --api-key.")
-
     targets = collect_targets(args.include_completed, args.limit)
     if not targets:
         print("No target pages.")
