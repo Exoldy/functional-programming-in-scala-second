@@ -1,5 +1,8 @@
 __pycache__/
 *.pyc
+.env
+.env.*
+.translation-cache/
 node_modules/
 docs/.vitepress/dist/
 docs/.vitepress/cache/

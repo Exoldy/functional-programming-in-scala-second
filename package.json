@@ -5,6 +5,8 @@
   "description": "PDF-to-Markdown workspace for Functional Programming in Scala, Second Edition",
   "scripts": {
     "convert": "python scripts/pdf_to_md.py",
+    "translate:ru": "python scripts/translate_pages_openrouter.py",
+    "translate:ru:smoke": "python scripts/translate_pages_openrouter.py --limit 1",
     "dev": "vitepress dev docs",
     "build": "vitepress build docs",
     "serve": "vitepress serve docs"
@@ -13,4 +15,3 @@
     "vitepress": "^1.6.4"
   }
 }
-
