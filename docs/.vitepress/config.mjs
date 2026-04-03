@@ -3,7 +3,7 @@ import sidebar from './sidebar.mjs'
 import sidebarRu from './sidebar-ru.mjs'
 
 export default defineConfig({
-  title: 'Functional Programming in Scala',
+  title: 'FP in Scala',
   description: 'Page-by-page Markdown conversion of the source PDF',
   base: '/functional-programming-in-scala-second/',
   locales: {
@@ -11,10 +11,10 @@ export default defineConfig({
       label: 'English',
       lang: 'en-US',
       themeConfig: {
+        siteTitle: 'FP in Scala',
         nav: [
           { text: 'Home', link: '/' },
-          { text: 'Pages', link: '/pages/' },
-          { text: 'Russian', link: '/ru/' }
+          { text: 'RU', link: '/ru/' }
         ],
         sidebar
       }
@@ -22,13 +22,13 @@ export default defineConfig({
     ru: {
       label: 'Русский',
       lang: 'ru-RU',
-      title: 'Функциональное программирование в Scala',
+      title: 'FP на Scala',
       description: 'Постраничный перевод и разметка книги Functional Programming in Scala, Second Edition',
       themeConfig: {
+        siteTitle: 'FP на Scala',
         nav: [
           { text: 'Главная', link: '/ru/' },
-          { text: 'Страницы', link: '/ru/pages/' },
-          { text: 'English', link: '/' }
+          { text: 'EN', link: '/' }
         ],
         sidebar: sidebarRu
       }
